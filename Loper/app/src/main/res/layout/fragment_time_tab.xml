@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".TimeTab">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <EditText
+            android:id="@+id/timeInHours_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:hint="@string/timeInHours_enter_hint"
+            android:textSize="24dp"
+            android:inputType="number"
+            android:backgroundTint="@color/colorPrimaryDark"/>
+
+        <EditText
+            android:id="@+id/timeInMinutes_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:hint="@string/timeInMinutes_enter_hint"
+            android:textSize="24dp"
+            android:inputType="number"
+            android:layout_below="@id/timeInHours_input"
+            android:backgroundTint="@color/colorPrimaryDark"/>
+
+    </RelativeLayout>
+
+</FrameLayout>

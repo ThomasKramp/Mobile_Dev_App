@@ -1,0 +1,66 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.2"
+
+    defaultConfig {
+        applicationId "com.example.loper"
+        minSdkVersion 16
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    compileOptions {
+        // Flag to enable support for the new language APIs
+        // Sets Java compatibility to Java 8
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation 'com.google.android.gms:play-services-maps:17.0.0'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    // Tab navigation
+    implementation 'com.android.support:design:26.1.0'
+    // Import the Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:25.12.0')
+    // Add the dependency for the Firebase SDK for Google Analytics
+    // When using the BoM, don't specify versions in Firebase dependencies
+    implementation 'com.google.firebase:firebase-analytics'
+
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+
+    // Deze implementaties willen voor een of andere redene niet implementeren
+    // Dit is zodat de Maps en Places SDK gezamelijk kunnen werken
+    //implementation name:'places-maps-sdk-3.1.0-beta', ext:'aar'
+    // Instalatie van de Places SDK
+    //implementation 'com.google.auto.value:auto-value-annotations:1.6.2'
+
+    // Instalatie van de Maps SDK
+    implementation 'com.google.android.gms:play-services-gcm:17.0.0'
+    // Google Locations
+    implementation 'com.google.android.gms:play-services-location:17.1.0'
+    // Google Places
+    implementation 'com.google.android.libraries.places:places:2.4.0'
+    // Google Directions
+    implementation 'com.google.maps:google-maps-services:0.15.0'
+    implementation 'org.slf4j:slf4j-simple:1.7.25'
+
+}
+apply plugin: 'com.google.gms.google-services'

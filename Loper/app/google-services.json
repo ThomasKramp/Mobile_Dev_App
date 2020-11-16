@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "991402667679",
+    "firebase_url": "https://loper-291919.firebaseio.com",
+    "project_id": "loper-291919",
+    "storage_bucket": "loper-291919.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:991402667679:android:ae67324c3a2ce2ffb1fcaa",
+        "android_client_info": {
+          "package_name": "com.example.loper"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "991402667679-rb2dgmeoslikkrb6f9s1ghmjqm4tjpm2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCugyPhyI5YQB5dbeMAbK6bYzVHIBMc9_U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "991402667679-rb2dgmeoslikkrb6f9s1ghmjqm4tjpm2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
