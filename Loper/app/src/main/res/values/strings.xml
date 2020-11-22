@@ -8,5 +8,6 @@
     <string name="distance_enter_hint">Enter distance in km</string>
     <string name="timeInHours_enter_hint">Enter time in Hours</string>
     <string name="timeInMinutes_enter_hint">Enter time in minutes</string>
+    <!--<String name="ietsVanuitDeCloud">B3:72:BD:32:5E:16:7D:84:06:4C:80:D2:61:3C:E2:6D:65:D4:C4:76</String>-->
 
 </resources>

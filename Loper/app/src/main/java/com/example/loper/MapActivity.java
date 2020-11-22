@@ -43,6 +43,11 @@ import com.google.maps.GeoApiContext;
 import com.google.maps.PendingResult;
 import com.google.maps.internal.PolylineEncoding;
 import com.google.maps.model.DirectionsResult;
+import com.google.maps.model.DirectionsRoute;
+import com.google.maps.model.TravelMode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -219,21 +224,21 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         // Gaat het start en eindpunt instellen
         // Gaat alleen met een "com.google.maps.model.LatLng" niet met een gewone Latlng
         directions.origin(new com.google.maps.model.LatLng(currenLocation.getLatitude(), currenLocation.getLongitude()));
-        directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude))
-                .setCallback(new PendingResult.Callback<DirectionsResult>() {
+        directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude));
+        directions.mode(TravelMode.WALKING);
+        directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
             @Override
             public void onResult(DirectionsResult result) {
                 Log.d(TAG, "calculateDirections: onResult: routes: " + result.routes[0].toString());
                 Log.d(TAG, "calculateDirections: onResult: duration: " + result.routes[0].legs[0].duration);
                 Log.d(TAG, "calculateDirections: onResult: distance: " + result.routes[0].legs[0].distance);
                 Log.d(TAG, "calculateDirections: onResult: geocodedWaypoints: " + result.geocodedWaypoints[0].toString());
-
                 addPolylines(result);
             }
 
             @Override
             public void onFailure(Throwable e) {
-                Log.d(TAG, "calculateDirections: onFailure: Failed to get diretions" + e.getMessage());
+                Log.d(TAG, "calculateDirections: onFailure: Failed to get diretions: " + e.getMessage());
             }
         });
     }
@@ -247,12 +252,17 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         });
         /*/
-        Log.d(TAG, "run: leg: " + result.routes[0].legs[0].toString());
+
         // Gaat de route decoderen
-        com.google.maps.model.LatLng route = (com.google.maps.model.LatLng)
-                PolylineEncoding.decode(result.routes[0].overviewPolyline.getEncodedPath());
-        Polyline polyline = mMap.addPolyline(new PolylineOptions()
-                .add(new LatLng(route.lat, route.lng)));
+        DirectionsRoute route[] = result.routes;
+        Log.d(TAG, "run: leg: " + route[0].legs[0].toString());
+        List<com.google.maps.model.LatLng> decodedPath = PolylineEncoding.decode(route[0].overviewPolyline.getEncodedPath());
+        List<LatLng> newDecodedPath = new ArrayList<>();
+        for (com.google.maps.model.LatLng latlng: decodedPath) {
+            newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
+        }
+        // Fout zit hier bij polylines aanmaken
+        Polyline polyline = mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
         polyline.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
     }
 
