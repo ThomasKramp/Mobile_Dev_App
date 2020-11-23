@@ -67,8 +67,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private float Default_Zoom = 17f;
     private double Latitude;
     private double Longitude;
-    private float Distance;
-    private int Time;
+    private float Distance; // distance in km
+    private float Time; // time in minutes
+    private int RunSpeed = 12; // speed in km/h
     private boolean GPSLocation;
     private Location currenLocation;
     private LatLng destination;
@@ -84,7 +85,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Latitude = intent.getDoubleExtra("Latitude", 0);
         Longitude = intent.getDoubleExtra("Longitude", 0);
         Distance = intent.getFloatExtra("Distance", 0);
-        Time = intent.getIntExtra("Time", 0);
+        Time = intent.getFloatExtra("Time", 0);
+        if (Time != 0 && Distance == 0){
+            Distance = (Time / 60) * RunSpeed;
+        }
 
         getLocationPermission();
     }
@@ -244,26 +248,22 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     }
 
     private void addPolylines(DirectionsResult result) {
-        /*/ Indien de polylines niet tonen
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
+        runOnUiThread(new Runnable() {
             @Override
             public void run() {
-
+                // Gaat de route decoderen
+                DirectionsRoute route[] = result.routes;
+                Log.d(TAG, "run: leg: " + route[0].legs[0].toString());
+                List<com.google.maps.model.LatLng> decodedPath = PolylineEncoding.decode(route[0].overviewPolyline.getEncodedPath());
+                List<LatLng> newDecodedPath = new ArrayList<>();
+                for (com.google.maps.model.LatLng latlng: decodedPath) {
+                    newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
+                }
+                // Fout zit hier bij polylines aanmaken
+                Polyline polyline = mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
+                // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
             }
         });
-        /*/
-
-        // Gaat de route decoderen
-        DirectionsRoute route[] = result.routes;
-        Log.d(TAG, "run: leg: " + route[0].legs[0].toString());
-        List<com.google.maps.model.LatLng> decodedPath = PolylineEncoding.decode(route[0].overviewPolyline.getEncodedPath());
-        List<LatLng> newDecodedPath = new ArrayList<>();
-        for (com.google.maps.model.LatLng latlng: decodedPath) {
-            newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
-        }
-        // Fout zit hier bij polylines aanmaken
-        Polyline polyline = mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
-        polyline.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
     }
 
     private void moveCamera(LatLng latLng, float zoom, String title) {

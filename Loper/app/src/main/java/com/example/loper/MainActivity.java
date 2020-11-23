@@ -43,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
     private DistanceTab distanceTab;
     private TimeTab timeTab;
     private float distance;
-    private int time;
+    private float time;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,8 +55,6 @@ public class MainActivity extends AppCompatActivity {
         mGPS = findViewById(R.id.button_gps);
         autocompleteFragment = (AutocompleteSupportFragment)
                 getSupportFragmentManager().findFragmentById(R.id.autocomplete_fragment);
-
-
 
         InitializePlaces();
     }
@@ -181,5 +179,4 @@ public class MainActivity extends AppCompatActivity {
         }
         return false;
     }
-
 }
