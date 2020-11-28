@@ -221,142 +221,84 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    private void addDirections(LatLng destination) {
-        DirectionsApiRequest directions = new DirectionsApiRequest(mGeoApiContext);
-
-        // Geeft verschillende routes weer
-        // directions.alternatives(true);
-        // Gaat het start en eindpunt instellen
-        // Gaat alleen met een "com.google.maps.model.LatLng" niet met een gewone Latlng
-        directions.origin(new com.google.maps.model.LatLng(currenLocation.getLatitude(), currenLocation.getLongitude()));
-        directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude));
-        directions.mode(TravelMode.WALKING);
-        directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
-            @Override
-            public void onResult(DirectionsResult result) {
-                Log.d(TAG, "calculateDirections: onResult: routes: " + result.routes[0].toString());
-                Log.d(TAG, "calculateDirections: onResult: duration: " + result.routes[0].legs[0].duration);
-                Log.d(TAG, "calculateDirections: onResult: distance: " + result.routes[0].legs[0].distance);
-                addPolylines(result);
-            }
-
-            @Override
-            public void onFailure(Throwable e) {
-                Log.d(TAG, "calculateDirections: onFailure: Failed to get diretions: " + e.getMessage());
-            }
-        });
+    private com.google.maps.model.LatLng calculateWaypoint(Double Latitude, Double Longitude,
+                                                           WindDirections direction){
+        /*/
+        North & South = Latitude
+        Latitude: 1 deg = 110.574 km
+        East & West = Longitude
+        Longitude: 1 deg = 111.320*cos(latitude) km
+        /*/
+        calcLatitude = 0;
+        calcLongitude = 0;
+        switch (direction) {
+            case North:
+                calcLatitude = Distance / (4 * 110.574);
+                break;
+            case North_East:
+                calcLatitude = Distance / (4 * 110.574);
+                calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
+                break;
+            case East:
+                calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
+                break;
+            case South_East:
+                calcLatitude = (Distance / (4 * 110.574)) * -1;
+                calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
+                break;
+            case South:
+                calcLatitude = (Distance / (4 * 110.574)) * -1;
+                break;
+            case South_West:
+                calcLatitude = (Distance / (4 * 110.574)) * -1;
+                calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
+                break;
+            case West:
+                calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
+                break;
+            case North_West:
+                calcLatitude = Distance / (4 * 110.574);
+                calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
+                break;
+        }
+        return new com.google.maps.model.LatLng(Latitude + calcLatitude,
+                Longitude + calcLongitude);
     }
 
     private boolean FoundDirections = false;
     private double calcLatitude = 0;
     private double calcLongitude = 0;
     private float runningDistance = 0;
-    //https://stackoverflow.com/questions/19486349/google-maps-route-generation-with-waypoints
-    //https://developers.google.com/maps/documentation/javascript/reference/directions#DirectionsWaypoint
     private com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
-    private com.google.maps.model.LatLng wayPoint;
-
     private enum WindDirections {
-        Noord,
-        Noord_Oost,
-        Oost,
-        Zuid_Oost,
-        Zuid,
-        Zuid_West,
+        North,
+        North_East,
+        East,
+        South_East,
+        South,
+        South_West,
         West,
-        Noord_West
-    }
-
-    private com.google.maps.model.LatLng circelRoute(Float latitude, Float Lonitude,
-                                                     WindDirections direction){
-        // Noord & Zuid = Latitude
-        // Oost & West = Longitude
-
-        switch (direction) {
-            case Noord:
-
-        }
-        // Noord
-        calcLatitude = 0;
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[1] = new com.google.maps.model.LatLng(wayPoints[0].lat + calcLatitude,
-                wayPoints[0].lng + calcLongitude);
-
-        // Noord-Oost
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[0] = new com.google.maps.model.LatLng(currenLocation.getLatitude() + calcLatitude,
-                currenLocation.getLongitude() + calcLongitude);
-
-        // Oost
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = 0;
-        wayPoint = new com.google.maps.model.LatLng(wayPoints[0].lat + calcLatitude,
-                wayPoints[0].lng + calcLongitude);
-
-        // Zuid-Oost
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoint = new com.google.maps.model.LatLng(wayPoints[0].lat - calcLatitude,
-                wayPoints[0].lng + calcLongitude);
-
-        // Zuid
-        calcLatitude = 0;
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoint = new com.google.maps.model.LatLng(wayPoints[1].lat - calcLatitude,
-                wayPoints[0].lng - calcLongitude);
-
-        // Zuid-West
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoint = new com.google.maps.model.LatLng(wayPoints[0].lat - calcLatitude,
-                wayPoints[0].lng - calcLongitude);
-
-        // West
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoint = new com.google.maps.model.LatLng(wayPoints[0].lat - calcLatitude,
-                wayPoints[0].lng - calcLongitude);
-
-        // Noord-West
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[2] = new com.google.maps.model.LatLng(wayPoints[0].lat + calcLatitude,
-                wayPoints[0].lng - calcLongitude);
-        return null;
+        North_West
     }
 
     private void calculateDirections(LatLng destination) {
         DirectionsApiRequest directions = new DirectionsApiRequest(mGeoApiContext);
-        // Latitude: 1 deg = 110.574 km
-        // Longitude: 1 deg = 111.320*cos(latitude) km
 
         /*/int counter = 0;
         while(!FoundDirections){}
         counter++;
         if (counter >= 4) FoundDirections = true;/*/
 
-        // Noord-Oost
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[0] = new com.google.maps.model.LatLng(currenLocation.getLatitude() + calcLatitude,
-                currenLocation.getLongitude() + calcLongitude);
+        wayPoints[0] = calculateWaypoint(currenLocation.getLatitude(), currenLocation.getLongitude(),
+                WindDirections.South);
+        wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, WindDirections.West);
+        wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, WindDirections.North);
 
-        // Noord
-        calcLatitude = 0;
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[1] = new com.google.maps.model.LatLng(wayPoints[0].lat + calcLatitude,
-                wayPoints[0].lng - calcLongitude);
-
-        // Noord-West
-        calcLatitude = Distance / (4 * 110.574);
-        calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-        wayPoints[2] = new com.google.maps.model.LatLng(wayPoints[1].lat - calcLatitude,
-                wayPoints[1].lng - calcLongitude);
-
+        // StartPunt toevoegen
         directions.origin(new com.google.maps.model.LatLng(currenLocation.getLatitude(), currenLocation.getLongitude()));
-        // Kan geen array van latlng meegeven
+        // Middelpunten toevoegen
         directions.waypoints(wayPoints);
+        // EindPunt toevoegen
         directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude));
         directions.optimizeWaypoints(true);
         directions.mode(TravelMode.WALKING);
