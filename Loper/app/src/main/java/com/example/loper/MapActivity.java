@@ -203,6 +203,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             moveCamera(mDestination, mDefaultZoom, "My Destination");
             calculateDirections(mDestination);
             mStartTime = SystemClock.elapsedRealtime();
+            Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
         } else {
             Log.d(TAG, "onComplete: current location is null");
         }
@@ -407,21 +408,21 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     @Override
     protected void onResume() {
         super.onResume();
-        //update();
+        update();
     }
 
     private Runnable updater;
     private void update(){
-        if (mStartTime != 0){
-            final Handler timerHandler = new Handler();
-            Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
+        final Handler timerHandler = new Handler();
 
-            updater = new Runnable() {
-                @Override
-                public void run() {
+        updater = new Runnable() {
+            private LatLng mPointOfReference;
+            @Override
+            public void run() {
+                if (mStartTime != 0){
                     int runningDistance = 0;
                     mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
-                    Log.d(TAG, "onComplete: Time Since Start = " + mRunTime + "min");
+                    Log.d(TAG, "onComplete: Time Running = " + mRunTime + "min");
 
                     for (DirectionsLeg leg: bestRoute.legs) {
                         String[] stringArray = new String[2];
@@ -434,44 +435,56 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         // Kijkt tussen welke 2 punten dat de user staat
                         if (isOnRoute(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(),
                                 mCurrenLocation.getLongitude()), leg.startLocation, leg.endLocation)){
+                                mPointOfReference = new LatLng(leg.startLocation.lat, leg.startLocation.lng);
                             // Kijkt of de gebruiker nog op tijd is
                             if (!isOnTime(runningDistance, runningDistance
                                     + Float.parseFloat(stringArray[0]), mRunTime)){
+                                // De afstand wordt aangepast naarmate je een zeker punt bereikt hebt
+                                mDistance -= runningDistance;
                                 // Indien de gebruiker niet op tijd is zal de applicatie
                                 // een nieuwe route maken
                                 calculateDirections(mDestination);
+                                // De start tijd wordt gereset
                                 mStartTime = SystemClock.elapsedRealtime();
                             }
                         }
                         runningDistance += Float.parseFloat(stringArray[0]);
                     }
-                    // Elke minuut wordt dit nagekeken
-                    timerHandler.postDelayed(updater,60 * 1000);
                 }
-                private boolean isOnRoute(com.google.maps.model.LatLng playerLocation,
-                                          com.google.maps.model.LatLng startLocation,
-                                          com.google.maps.model.LatLng endLocation){
-                    // Ziet of de huidige locatie op de route staat voor latitude
-                    if ((startLocation.lat < playerLocation.lat && playerLocation.lat < endLocation.lat)
-                            || (startLocation.lat > playerLocation.lat && playerLocation.lat > endLocation.lat)){
+                // Elke minuut wordt dit nagekeken
+                timerHandler.postDelayed(updater,60 * 1000);
+            }
 
-                        // Ziet of de huidige locatie op de route staat voor longitude
-                        return (startLocation.lng < playerLocation.lng && playerLocation.lng < endLocation.lng)
-                                || (startLocation.lng > playerLocation.lng && playerLocation.lng > endLocation.lng);
-                    }
-                    return false;
-                }
+            private boolean isOnRoute(com.google.maps.model.LatLng playerLocation,
+                                      com.google.maps.model.LatLng startLocation,
+                                      com.google.maps.model.LatLng endLocation){
+                // Ziet of de huidige locatie op de route staat voor latitude
+                if ((startLocation.lat < playerLocation.lat && playerLocation.lat < endLocation.lat)
+                        || (startLocation.lat > playerLocation.lat && playerLocation.lat > endLocation.lat)){
 
-                private boolean isOnTime(float beginDistanceRoute, float endDistanceRoute,
-                                         float timeSinceCreate){
-                    // Mijn snelheid * De gemiddelde loopsnelheid = De afstand die ik afgelegd heb
-                    // Indien deze afstand tussen de afstanden van de route ligt,
-                    // dan ben ik nog op schema
-                    return beginDistanceRoute <= timeSinceCreate * mRunSpeed
-                            && timeSinceCreate * mRunSpeed <= endDistanceRoute;
+                    // Ziet of de huidige locatie op de route staat voor longitude
+                    return (startLocation.lng < playerLocation.lng && playerLocation.lng < endLocation.lng)
+                            || (startLocation.lng > playerLocation.lng && playerLocation.lng > endLocation.lng);
                 }
-            };
-            timerHandler.post(updater);
-        }
+                return false;
+            }
+
+            private boolean isOnTime(float beginDistanceRoute, float endDistanceRoute,
+                                     float timeSinceCreate){
+                // Mijn snelheid * De gemiddelde loopsnelheid = De afstand die ik afgelegd heb
+                // Indien deze afstand tussen de afstanden van de route ligt,
+                // dan ben ik nog op schema
+                return beginDistanceRoute <= timeSinceCreate * mRunSpeed
+                        && timeSinceCreate * mRunSpeed <= endDistanceRoute;
+            }
+        };
+        timerHandler.post(updater);
     }
 }
+
+/*
+    LogCat Searches:
+    calculateDirections: onResult:
+    onResult: Route
+    onComplete: Time
+ */
