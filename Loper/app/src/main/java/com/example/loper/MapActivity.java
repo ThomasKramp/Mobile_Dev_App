@@ -19,6 +19,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -64,13 +66,17 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     String[] Permissions = {COARSE_LOCATION, FINE_LOCATION};
     private int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
-    private Boolean mLocationPermissionGranted = false;
+    private boolean mLocationPermissionGranted = false;
     private float mDefaultZoom = 15f;
     private double mLatitude;
     private double mLongitude;
     private float mDistance; // distance in km
     private float mTime; // time in minutes
-    private int mRunSpeed = 12; // speed in km/h
+    private float mRunSpeed = 12 / 60; // speed in km/min (km/h / 60 = km/min)
+
+    private long mStartTime;
+    private float mRunTime;
+
     private Location mCurrenLocation;
     private LatLng mDestination;
     private GeoApiContext mGeoApiContext = null;
@@ -84,10 +90,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         mLatitude = intent.getDoubleExtra("Latitude", 0);
         mLongitude = intent.getDoubleExtra("Longitude", 0);
         mDistance = intent.getFloatExtra("Distance", 0);
+        // BUG: Tijd wordt niet meegegeven
         mTime = intent.getFloatExtra("Time", 0);
-        if (mTime != 0 && mDistance == 0){
-            mDistance = (mTime / 60) * mRunSpeed;
-        }
+        if (mTime != 0 && mDistance == 0) mDistance = mTime * mRunSpeed;
 
         getLocationPermission();
     }
@@ -111,7 +116,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    // Kijk na of het programma werkt zonder deze methode
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -161,10 +165,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
             // Gaat een blauwe stip op onze locatie zetten
             mMap.setMyLocationEnabled(true);
-            // Gaat de default show loation knop weghalen
+            // Gaat de default show location knop weghalen
             // Dit is omdat je de default knop niet kunt verplaatsen
             mMap.getUiSettings().setMyLocationButtonEnabled(false);
-            //InitializeSearch();
         }
     }
 
@@ -199,6 +202,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
             moveCamera(mDestination, mDefaultZoom, "My Destination");
             calculateDirections(mDestination);
+            mStartTime = SystemClock.elapsedRealtime();
         } else {
             Log.d(TAG, "onComplete: current location is null");
         }
@@ -239,6 +243,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             @Override
             public void onResult(DirectionsResult result) {
                 Log.d(TAG, "calculateDirections: onResult: routes: " + result.routes[0].legs[0].toString());
+                bestRoute = result.routes[0];
                 for (DirectionsLeg leg: result.routes[0].legs) {
                     Log.d(TAG, "calculateDirections: onResult: duration: " + leg.duration);
                     Log.d(TAG, "calculateDirections: onResult: distance: " + leg.distance);
@@ -248,7 +253,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             @Override
             public void onFailure(Throwable e) {
-                Log.d(TAG, "calculateDirections: onFailure: Failed to get diretions: " + e.getMessage());
+                Log.d(TAG, "calculateDirections: onFailure: Failed to get directions: " + e.getMessage());
             }
         });
     }
@@ -256,6 +261,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private float bestDistance = 0;
     private WindDirections[] bestDirections = new WindDirections[3];
     private boolean gotResult = false;
+    private com.google.maps.model.DirectionsRoute bestRoute = null;
 
     private void generateBestDirection(LatLng destination) {
         List<WindDirections[]> directionsList = generateDirections();
@@ -296,7 +302,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                 @Override
                 public void onFailure(Throwable e) {
-                    Log.d(TAG, "calculateDirections: onFailure: Failed to get diretions: " + e.getMessage());
+                    Log.d(TAG, "calculateDirections: onFailure: Failed to get directions: " + e.getMessage());
                     gotResult = true;
                 }
             });
@@ -396,5 +402,76 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        //update();
+    }
+
+    private Runnable updater;
+    private void update(){
+        if (mStartTime != 0){
+            final Handler timerHandler = new Handler();
+            Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
+
+            updater = new Runnable() {
+                @Override
+                public void run() {
+                    int runningDistance = 0;
+                    mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
+                    Log.d(TAG, "onComplete: Time Since Start = " + mRunTime + "min");
+
+                    for (DirectionsLeg leg: bestRoute.legs) {
+                        String[] stringArray = new String[2];
+                        if(leg.distance.toString().contains(" mi")) stringArray = leg.distance.toString().split(" mi");
+                        if(leg.distance.toString().contains(" km")) stringArray = leg.distance.toString().split(" km");
+
+                        Log.d(TAG, "onResult: RouteStart: " + leg.startLocation);
+                        Log.d(TAG, "onResult: RouteEnd: " + leg.endLocation);
+
+                        // Kijkt tussen welke 2 punten dat de user staat
+                        if (isOnRoute(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(),
+                                mCurrenLocation.getLongitude()), leg.startLocation, leg.endLocation)){
+                            // Kijkt of de gebruiker nog op tijd is
+                            if (!isOnTime(runningDistance, runningDistance
+                                    + Float.parseFloat(stringArray[0]), mRunTime)){
+                                // Indien de gebruiker niet op tijd is zal de applicatie
+                                // een nieuwe route maken
+                                calculateDirections(mDestination);
+                                mStartTime = SystemClock.elapsedRealtime();
+                            }
+                        }
+                        runningDistance += Float.parseFloat(stringArray[0]);
+                    }
+                    // Elke minuut wordt dit nagekeken
+                    timerHandler.postDelayed(updater,60 * 1000);
+                }
+                private boolean isOnRoute(com.google.maps.model.LatLng playerLocation,
+                                          com.google.maps.model.LatLng startLocation,
+                                          com.google.maps.model.LatLng endLocation){
+                    // Ziet of de huidige locatie op de route staat voor latitude
+                    if ((startLocation.lat < playerLocation.lat && playerLocation.lat < endLocation.lat)
+                            || (startLocation.lat > playerLocation.lat && playerLocation.lat > endLocation.lat)){
+
+                        // Ziet of de huidige locatie op de route staat voor longitude
+                        return (startLocation.lng < playerLocation.lng && playerLocation.lng < endLocation.lng)
+                                || (startLocation.lng > playerLocation.lng && playerLocation.lng > endLocation.lng);
+                    }
+                    return false;
+                }
+
+                private boolean isOnTime(float beginDistanceRoute, float endDistanceRoute,
+                                         float timeSinceCreate){
+                    // Mijn snelheid * De gemiddelde loopsnelheid = De afstand die ik afgelegd heb
+                    // Indien deze afstand tussen de afstanden van de route ligt,
+                    // dan ben ik nog op schema
+                    return beginDistanceRoute <= timeSinceCreate * mRunSpeed
+                            && timeSinceCreate * mRunSpeed <= endDistanceRoute;
+                }
+            };
+            timerHandler.post(updater);
+        }
     }
 }

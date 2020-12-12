@@ -1,6 +1,6 @@
 <resources>
     <string name="Maps_API_key">AIzaSyCxVkfBeDd-mBiG-WCzE8481RwBjVqKQPA</string>
-    <string name="app_name">Loop Maar Rond</string>
+    <string name="app_name">Urban Runner</string>
     <string name="button_map">Start</string>
     <string name="distance_tab">Set Distance</string>
     <string name="time_tab">Set Time</string>
