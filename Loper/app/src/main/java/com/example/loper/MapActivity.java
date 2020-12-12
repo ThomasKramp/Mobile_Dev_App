@@ -422,33 +422,45 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 if (mStartTime != 0){
                     int runningDistance = 0;
                     mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
-                    Log.d(TAG, "onComplete: Time Running = " + mRunTime + "min");
+                    Log.d(TAG, "run: Time Running = " + mRunTime + "min");
 
                     for (DirectionsLeg leg: bestRoute.legs) {
-                        String[] stringArray = new String[2];
-                        if(leg.distance.toString().contains(" mi")) stringArray = leg.distance.toString().split(" mi");
-                        if(leg.distance.toString().contains(" km")) stringArray = leg.distance.toString().split(" km");
+                        float tempDistance = 0;
+                        String[] stringArray;
 
-                        Log.d(TAG, "onResult: RouteStart: " + leg.startLocation);
-                        Log.d(TAG, "onResult: RouteEnd: " + leg.endLocation);
+                        if(leg.distance.toString().contains(" km")) {
+                            stringArray = leg.distance.toString().split(" km");
+                            tempDistance += Float.parseFloat(stringArray[0]);
+                        }
+                        else if(leg.distance.toString().contains(" m")) {
+                            stringArray = leg.distance.toString().split(" m");
+                            tempDistance += Float.parseFloat(stringArray[0]) / 1000;
+                        }
+                        else if(leg.distance.toString().contains(" mi")) {
+                            stringArray = leg.distance.toString().split(" mi");
+                            tempDistance += Float.parseFloat(stringArray[0]) / 0.62137;
+                        }
+                        else if(leg.distance.toString().contains(" ft")) {
+                            stringArray = leg.distance.toString().split(" ft");
+                            tempDistance += Float.parseFloat(stringArray[0]) / 3280.8;
+                        }
+
+                        Log.d(TAG, "run: RouteStart: " + leg.startLocation);
+                        Log.d(TAG, "run: RouteEnd: " + leg.endLocation);
 
                         // Kijkt tussen welke 2 punten dat de user staat
-                        if (isOnRoute(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(),
-                                mCurrenLocation.getLongitude()), leg.startLocation, leg.endLocation)){
-                                mPointOfReference = new LatLng(leg.startLocation.lat, leg.startLocation.lng);
-                            // Kijkt of de gebruiker nog op tijd is
-                            if (!isOnTime(runningDistance, runningDistance
-                                    + Float.parseFloat(stringArray[0]), mRunTime)){
-                                // De afstand wordt aangepast naarmate je een zeker punt bereikt hebt
-                                mDistance -= runningDistance;
-                                // Indien de gebruiker niet op tijd is zal de applicatie
-                                // een nieuwe route maken
-                                calculateDirections(mDestination);
-                                // De start tijd wordt gereset
-                                mStartTime = SystemClock.elapsedRealtime();
-                            }
+                        // if (isOnRoute(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()), leg.startLocation, leg.endLocation)){ }
+                        // Kijkt of de gebruiker nog op tijd is
+                        if (!isOnTime(runningDistance, runningDistance + tempDistance, mRunTime)){
+                            // De afstand wordt aangepast naarmate je een zeker punt bereikt hebt
+                            mDistance -= runningDistance;
+                            // Indien de gebruiker niet op tijd is zal de applicatie
+                            // een nieuwe route maken
+                            calculateDirections(mDestination);
+                            // De start tijd wordt gereset
+                            mStartTime = SystemClock.elapsedRealtime();
                         }
-                        runningDistance += Float.parseFloat(stringArray[0]);
+                        runningDistance += tempDistance;
                     }
                 }
                 // Elke minuut wordt dit nagekeken
@@ -484,7 +496,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 /*
     LogCat Searches:
-    calculateDirections: onResult:
-    onResult: Route
-    onComplete: Time
+    calculateDirections:
+    run:
  */
