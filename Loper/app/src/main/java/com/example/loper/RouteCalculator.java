@@ -1,79 +1,161 @@
 package com.example.loper;
 
+// AsyncTask: https://www.youtube.com/watch?v=uKx0FuVriqA
+
 import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.DirectionsApiRequest;
 import com.google.maps.GeoApiContext;
 import com.google.maps.PendingResult;
+import com.google.maps.internal.PolylineEncoding;
 import com.google.maps.model.DirectionsLeg;
 import com.google.maps.model.DirectionsResult;
+import com.google.maps.model.DirectionsRoute;
 import com.google.maps.model.TravelMode;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
 public class RouteCalculator {
 
+    // Constructor variabelen
     private Location mCurrentLocation;
-    private LatLng mDestination = null;
-    private GeoApiContext mGeoApiContext = null;
+    private LatLng mDestination;
     private GoogleMap mMap;
+    private GeoApiContext mGeoApiContext;
 
-    public RouteCalculator(){
+    public RouteCalculator(Location currentLocation, LatLng destination, GoogleMap map,
+                           String ApiKey){
+        mCurrentLocation = currentLocation;
+        mDestination = destination;
+        mMap = map;
+        // Instantieer de directions calculator
+        mGeoApiContext = new GeoApiContext.Builder()
+                .apiKey(ApiKey)
+                .build();
 
     }
 
-    public void CalculateTask(float mDistance){
-        DirectionsTask directionsTask = new DirectionsTask();
-        directionsTask.execute(mDistance);
+    // Task Variabelen
+    private String TAG = "RouteCalculator";
+    public DirectionsRoute bestRoute = null;
+
+    public void CalculateTask(float distance){
+        DirectionsTask directionsTask = new DirectionsTask(this);
+        directionsTask.execute(distance);
     }
 
-    private String TAG = "MapActivity";
-    private float bestDistance = 0;
-    private WindDirections[] bestDirections = new WindDirections[3];
-    private boolean gotResult = false;
-    private com.google.maps.model.DirectionsRoute bestRoute = null;
+    private static class DirectionsTask extends AsyncTask<Float, Void, DirectionsRoute>{
 
-    private void calculateDirections(Float distance) {
-        DirectionsApiRequest directions = new DirectionsApiRequest(mGeoApiContext);
-        com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
-        wayPoints[0] = calculateWaypoint(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(),
-                bestDirections[0], distance);
-        wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, bestDirections[1], distance);
-        wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, bestDirections[2], distance);
+        WeakReference<RouteCalculator> calculatorWeakReference;
 
-        // StartPunt toevoegen
-        directions.origin(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
-        // Middelpunten toevoegen
-        directions.waypoints(wayPoints);
-        // EindPunt toevoegen
-        directions.destination(new com.google.maps.model.LatLng(mDestination.latitude, mDestination.longitude));
-        directions.optimizeWaypoints(true);
-        directions.mode(TravelMode.WALKING);
-        directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
-            @Override
-            public void onResult(DirectionsResult result) {
-                Log.d(TAG, "calculateDirections: onResult: routes: " + result.routes[0].legs[0].toString());
-                bestRoute = result.routes[0];
-                for (DirectionsLeg leg: result.routes[0].legs) {
-                    Log.d(TAG, "calculateDirections: onResult: duration: " + leg.duration);
-                    Log.d(TAG, "calculateDirections: onResult: distance: " + leg.distance);
-                }
-                //addPolylines(result);
+        public DirectionsTask(RouteCalculator calculator){
+            calculatorWeakReference = new WeakReference<RouteCalculator>(calculator);
+        }
+
+        float bestDistance = 0;
+        boolean gotResult = false;
+        boolean gotBestRoute = false;
+        float distance;
+
+        @Override
+        protected DirectionsRoute doInBackground(Float... floats) {
+            RouteCalculator calculator = calculatorWeakReference.get();
+            distance = floats[0];
+            Log.d(calculator.TAG, "doInBackground: Total distance: " + distance);
+            List<WindDirections[]> directionsList = calculator.generateDirections();
+            bestDistance -= distance;
+
+            for (WindDirections[] windDirections: directionsList){
+                DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
+                com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
+                gotResult = false;
+
+                wayPoints[0] = calculator.calculateWaypoint(calculator.mCurrentLocation.getLatitude(),
+                        calculator.mCurrentLocation.getLongitude(), windDirections[0], distance);
+                wayPoints[1] = calculator.calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng,
+                        windDirections[1], distance);
+                wayPoints[2] = calculator.calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng,
+                        windDirections[2], distance);
+
+                directions.origin(new com.google.maps.model.LatLng(calculator.mCurrentLocation.getLatitude(),
+                        calculator.mCurrentLocation.getLongitude()));
+                directions.waypoints(wayPoints);
+                directions.destination(new com.google.maps.model.LatLng(calculator.mDestination.latitude,
+                        calculator.mDestination.longitude));
+                directions.optimizeWaypoints(true);
+                directions.mode(TravelMode.WALKING);
+                directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
+                    @Override
+                    public void onResult(DirectionsResult result) {
+                        float runningDistance = 0;
+                        for (DirectionsLeg leg: result.routes[0].legs) {
+                            String[] stringArray = new String[2];
+                            if(leg.distance.toString().contains(" km")) {
+                                stringArray = leg.distance.toString().split(" km");
+                                runningDistance += Float.parseFloat(stringArray[0]);
+                            }
+                            else if(leg.distance.toString().contains(" m")) {
+                                stringArray = leg.distance.toString().split(" m");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 1000;
+                            }
+                            else if(leg.distance.toString().contains(" mi")) {
+                                stringArray = leg.distance.toString().split(" mi");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 0.62137;
+                            }
+                            else if(leg.distance.toString().contains(" ft")) {
+                                stringArray = leg.distance.toString().split(" ft");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 3280.8;
+                            }
+                        }
+                        Log.d(calculator.TAG, "onResult: Total distance: " + runningDistance);
+                        if(Math.abs(distance - runningDistance) < Math.abs(distance - bestDistance)){
+                            calculator.bestRoute = result.routes[0];
+                            bestDistance = runningDistance;
+                            if (distance == runningDistance) gotBestRoute = true;
+                        }
+                        gotResult = true;
+                    }
+
+                    @Override
+                    public void onFailure(Throwable e) {
+                        Log.d(calculator.TAG, "onFailure: Failed to get directions: " + e.getMessage());
+                        gotResult = true;
+                    }
+                });
+                if (gotBestRoute)
+                    return calculator.bestRoute;
+                while (!gotResult);
             }
+            return calculator.bestRoute;
+        }
 
-            @Override
-            public void onFailure(Throwable e) {
-                Log.d(TAG, "calculateDirections: onFailure: Failed to get directions: " + e.getMessage());
+        @Override
+        protected void onPostExecute(DirectionsRoute directionsRoute) {
+            super.onPostExecute(directionsRoute);
+            RouteCalculator calculator = calculatorWeakReference.get();
+            // Gaat de route decoderen
+            Log.d(calculator.TAG, "onPostExecute: leg: " + directionsRoute.legs[0].toString());
+            List<com.google.maps.model.LatLng> decodedPath =
+                    PolylineEncoding.decode(directionsRoute.overviewPolyline.getEncodedPath());
+            List<LatLng> newDecodedPath = new ArrayList<>();
+            for (com.google.maps.model.LatLng latlng: decodedPath) {
+                newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
             }
-        });
+            Polyline polyline = calculator.mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
+            // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
+        }
     }
 
-    private List<WindDirections[]> generateDirections(float distance){
+    // Extra methodes
+    private List<WindDirections[]> generateDirections(){
         List<WindDirections[]> directionsList = new ArrayList<>();
         // Elke wind richting mag 1 keer voorkomen
         // De wind richting mag niet gevolgd worden door zijn tegengestelde
@@ -126,7 +208,10 @@ public class RouteCalculator {
             case West:
                 calcLongitude = (distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
                 break;
-            /*/
+        }
+        return new com.google.maps.model.LatLng(Latitude + calcLatitude,
+                Longitude + calcLongitude);
+            /*/ Voor enige extensies
             case North_East:
                 calcLatitude = Distance / (4 * 110.574);
                 calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
@@ -144,86 +229,5 @@ public class RouteCalculator {
                 calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
                 break;
                 /*/
-        }
-        return new com.google.maps.model.LatLng(Latitude + calcLatitude,
-                Longitude + calcLongitude);
-    }
-    /*/
-        private void addPolylines(DirectionsResult result) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    // Gaat de route decoderen
-                    DirectionsRoute[] route = result.routes;
-                    Log.d(TAG, "run: leg: " + route[0].legs[0].toString());
-                    List<com.google.maps.model.LatLng> decodedPath = PolylineEncoding.decode(route[0].overviewPolyline.getEncodedPath());
-                    List<LatLng> newDecodedPath = new ArrayList<>();
-                    for (com.google.maps.model.LatLng latlng: decodedPath) {
-                        newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
-                    }
-                    Polyline polyline = mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
-                    // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
-                }
-            });
-        }
-    /*/
-    private class DirectionsTask extends AsyncTask<Float, Void, Void>{
-
-        private float distance;
-        @Override
-        protected Void doInBackground(Float... floats) {
-            distance = floats[0];
-            List<WindDirections[]> directionsList = generateDirections(distance);
-            bestDistance -= distance;
-
-            for (WindDirections[] windDirections: directionsList){
-                DirectionsApiRequest directions = new DirectionsApiRequest(mGeoApiContext);
-                com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
-                gotResult = false;
-
-                wayPoints[0] = calculateWaypoint(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(),
-                        windDirections[0], distance);
-                wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, windDirections[1], distance);
-                wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, windDirections[2], distance);
-
-                directions.origin(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
-                directions.waypoints(wayPoints);
-                directions.destination(new com.google.maps.model.LatLng(mDestination.latitude, mDestination.longitude));
-                directions.optimizeWaypoints(true);
-                directions.mode(TravelMode.WALKING);
-                directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
-                    @Override
-                    public void onResult(DirectionsResult result) {
-                        float runningDistance = 0;
-                        for (DirectionsLeg leg: result.routes[0].legs) {
-                            String[] stringArray = new String[2];
-                            if(leg.distance.toString().contains(" mi")) stringArray = leg.distance.toString().split(" mi");
-                            if(leg.distance.toString().contains(" km")) stringArray = leg.distance.toString().split(" km");
-                            runningDistance += Float.parseFloat(stringArray[0]);
-                        }
-                        Log.d(TAG, "calculateDirections: onResult: Total distance: " + runningDistance);
-                        if(Math.abs(distance - runningDistance) < Math.abs(distance - bestDistance)){
-                            bestDirections = windDirections;
-                            bestDistance = runningDistance;
-                        }
-                        gotResult = true;
-                    }
-
-                    @Override
-                    public void onFailure(Throwable e) {
-                        Log.d(TAG, "calculateDirections: onFailure: Failed to get directions: " + e.getMessage());
-                        gotResult = true;
-                    }
-                });
-                while (!gotResult);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            super.onPostExecute(aVoid);
-            generateDirections(distance);
-        }
     }
 }

@@ -1,5 +1,9 @@
 package com.example.loper;
 
+// Searchbar: (CodingWithMich)
+// Google Maps & Google Places Android Course (Epsiode 8 - 9)
+// https://www.youtube.com/playlist?list=PLgCYzUzKIBE-vInwQhGSdnbyJ62nixHCt
+
 import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
@@ -24,6 +28,7 @@ import com.google.android.libraries.places.widget.listener.PlaceSelectionListene
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.Arrays;
+
 
 public class MainActivity extends AppCompatActivity {
 

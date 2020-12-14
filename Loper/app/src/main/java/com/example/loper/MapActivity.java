@@ -14,6 +14,14 @@ package com.example.loper;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// MapFragment & Marker: (CodingWithMich)
+// Google Maps & Google Places Android Course (Epsiode 1 - 7)
+// https://www.youtube.com/playlist?list=PLgCYzUzKIBE-vInwQhGSdnbyJ62nixHCt
+
+// Polylines: (CodingWithMich)
+// Google Maps and Google Directions API (Epsiode 18 - 20)
+// https://www.youtube.com/playlist?list=PLgCYzUzKIBE-SZUrVOsbYMzH7tPigT3gi
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -37,21 +45,9 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.Polyline;
-import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-import com.google.maps.DirectionsApiRequest;
-import com.google.maps.GeoApiContext;
-import com.google.maps.PendingResult;
-import com.google.maps.internal.PolylineEncoding;
 import com.google.maps.model.DirectionsLeg;
-import com.google.maps.model.DirectionsResult;
-import com.google.maps.model.DirectionsRoute;
-import com.google.maps.model.TravelMode;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -83,10 +79,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private long mStartTime;
     private float mRunTime;
 
+    private RouteCalculator calculator;
+
     // Maps Variabelen
     private Location mCurrentLocation;
     private LatLng mDestination = null;
-    private GeoApiContext mGeoApiContext = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -148,13 +145,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment)
                 getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(MapActivity.this);
-
-        // Instantieer de directions calculator
-        if (mGeoApiContext == null){
-            mGeoApiContext= new GeoApiContext.Builder()
-                    .apiKey(getString(R.string.Maps_API_key))
-                    .build();
-        }
     }
 
     public void onMapReady(GoogleMap googleMap) {
@@ -196,7 +186,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         if (task.isSuccessful()) {
                             Log.d(TAG, "onComplete: found location");
                             mCurrentLocation = (Location) task.getResult();
-                            moveCamera(new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()),
+                            addMarker(new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()),
                                     mDefaultZoom, "Start");
                             if (mCurrentLocation != null){
                                 if (mLatitude != 0 || mLongitude != 0) {
@@ -204,7 +194,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 } else {
                                     mDestination = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
                                 }
-                                addDirections(mDestination);
+                                addMarker(mDestination, mDefaultZoom, "Destination");
+                                calculator = new RouteCalculator(mCurrentLocation, mDestination, mMap,
+                                        getString(R.string.Maps_API_key));
+                                calculator.CalculateTask(mDistance);
                                 mStartTime = SystemClock.elapsedRealtime();
                                 Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
                             }
@@ -219,169 +212,16 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    private void moveCamera(LatLng latLng, float zoom, String title) {
+    private void addMarker(LatLng latLng, float zoom, String title) {
         // Gaat een zekere zoom initalizeren op de coördinaten van de huidige positie
         Log.d(TAG, "moveCamera: moving the camera to lat: " + latLng.latitude +
                 ", lng: " + latLng.longitude);
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
+        if (title == "Start") mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
         // Marker zetten op de meegegeven plaats
         MarkerOptions options = new MarkerOptions()
                 .position(latLng)
                 .title(title);
         mMap.addMarker(options);
-    }
-
-    private void addDirections(LatLng destination) {
-        calculateDirections(destination);
-        addPolylines(bestRoute);
-    }
-
-    private float bestDistance = 0;
-    private boolean gotResult = false;
-    private boolean gotBestRoute = false;
-    private DirectionsRoute bestRoute = null;
-
-    private void calculateDirections(LatLng destination) {
-        List<WindDirections[]> directionsList = generateDirections();
-        bestDistance -= mDistance;
-
-        for (WindDirections[] windDirections: directionsList){
-            DirectionsApiRequest directions = new DirectionsApiRequest(mGeoApiContext);
-            com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
-            gotResult = false;
-
-            wayPoints[0] = calculateWaypoint(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(),
-                    windDirections[0]);
-            wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, windDirections[1]);
-            wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, windDirections[2]);
-
-            directions.origin(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
-            directions.waypoints(wayPoints);
-            directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude));
-            directions.optimizeWaypoints(true);
-            directions.mode(TravelMode.WALKING);
-            directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
-                @Override
-                public void onResult(DirectionsResult result) {
-                    float runningDistance = 0;
-                    for (DirectionsLeg leg: result.routes[0].legs) {
-                        String[] stringArray = new String[2];
-                        if(leg.distance.toString().contains(" mi")) stringArray = leg.distance.toString().split(" mi");
-                        if(leg.distance.toString().contains(" km")) stringArray = leg.distance.toString().split(" km");
-                        runningDistance += Float.parseFloat(stringArray[0]);
-                    }
-                    Log.d(TAG, "calculateDirections: onResult: Total distance: " + runningDistance);
-                    if(Math.abs(mDistance - runningDistance) < Math.abs(mDistance - bestDistance)){
-                        bestRoute = result.routes[0];
-                        bestDistance = runningDistance;
-                        if (mDistance == runningDistance) gotBestRoute = true;
-                    }
-                    gotResult = true;
-                }
-
-                @Override
-                public void onFailure(Throwable e) {
-                    Log.d(TAG, "calculateDirections: onFailure: Failed to get directions: " + e.getMessage());
-                    gotResult = true;
-                }
-            });
-            if (gotBestRoute)
-                return;
-            while (!gotResult);
-        }
-    }
-
-    private List<WindDirections[]> generateDirections(){
-        List<WindDirections[]> directionsList = new ArrayList<>();
-        // Elke wind richting mag 1 keer voorkomen
-        // De wind richting mag niet gevolgd worden door zijn tegengestelde
-        for (WindDirections firstValue: WindDirections.values()){
-
-            for (WindDirections secondValue: WindDirections.values()){
-                if (firstValue != secondValue && !AreOppositeDirections(firstValue, secondValue)){
-
-                    for (WindDirections thirdValue: WindDirections.values()){
-                        if (firstValue != thirdValue && secondValue != thirdValue
-                                && !AreOppositeDirections(secondValue, thirdValue)){
-
-                            directionsList.add(new WindDirections[]
-                                    {firstValue, secondValue, thirdValue});
-                        }
-                    }
-                }
-            }
-        }
-        return directionsList;
-    }
-
-    private boolean AreOppositeDirections(WindDirections directionsOne, WindDirections directionsTwo){
-        return (directionsOne == WindDirections.North && directionsTwo == WindDirections.South)
-                || (directionsOne == WindDirections.East && directionsTwo == WindDirections.West)
-                || (directionsOne == WindDirections.South && directionsTwo == WindDirections.North)
-                || (directionsOne == WindDirections.West && directionsTwo == WindDirections.East);
-    }
-
-    private com.google.maps.model.LatLng calculateWaypoint(Double Latitude, Double Longitude,
-                                                           WindDirections direction){
-        /*/
-        North & South = Latitude
-        Latitude: 1 deg = 110.574 km
-        East & West = Longitude
-        Longitude: 1 deg = 111.320*cos(latitude) km
-        /*/
-        double calcLatitude = 0;
-        double calcLongitude = 0;
-        switch (direction) {
-            case North:
-                calcLatitude = mDistance / (4 * 110.574);
-                break;
-            case East:
-                calcLongitude = mDistance / (4 * 111.320 * Math.cos(calcLatitude));
-                break;
-            case South:
-                calcLatitude = (mDistance / (4 * 110.574)) * -1;
-                break;
-            case West:
-                calcLongitude = (mDistance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
-                break;
-            /*/
-            case North_East:
-                calcLatitude = Distance / (4 * 110.574);
-                calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-                break;
-            case South_East:
-                calcLatitude = (Distance / (4 * 110.574)) * -1;
-                calcLongitude = Distance / (4 * 111.320 * Math.cos(calcLatitude));
-                break;
-            case South_West:
-                calcLatitude = (Distance / (4 * 110.574)) * -1;
-                calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
-                break;
-            case North_West:
-                calcLatitude = Distance / (4 * 110.574);
-                calcLongitude = (Distance / (4 * 111.320 * Math.cos(calcLatitude))) * -1;
-                break;
-                /*/
-        }
-        return new com.google.maps.model.LatLng(Latitude + calcLatitude,
-                Longitude + calcLongitude);
-    }
-
-    private void addPolylines(DirectionsRoute route) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                // Gaat de route decoderen
-                Log.d(TAG, "run: leg: " + route.legs[0].toString());
-                List<com.google.maps.model.LatLng> decodedPath = PolylineEncoding.decode(route.overviewPolyline.getEncodedPath());
-                List<LatLng> newDecodedPath = new ArrayList<>();
-                for (com.google.maps.model.LatLng latlng: decodedPath) {
-                    newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
-                }
-                Polyline polyline = mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
-                // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
-            }
-        });
     }
 
     @Override
@@ -403,7 +243,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                     mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
                     Log.d(TAG, "run: Time Running = " + mRunTime + "min");
 
-                    for (DirectionsLeg leg: bestRoute.legs) {
+                    for (DirectionsLeg leg: calculator.bestRoute.legs) {
                         float tempDistance = 0;
                         String[] stringArray;
 
@@ -435,7 +275,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             mDistance -= runningDistance;
                             // Indien de gebruiker niet op tijd is zal de applicatie
                             // een nieuwe route maken
-                            addDirections(mDestination);
+                            calculator.CalculateTask(mDistance);
                             // De start tijd wordt gereset
                             mStartTime = SystemClock.elapsedRealtime();
                         }
