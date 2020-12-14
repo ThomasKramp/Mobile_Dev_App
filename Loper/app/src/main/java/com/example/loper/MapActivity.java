@@ -39,6 +39,8 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.maps.DirectionsApiRequest;
 import com.google.maps.GeoApiContext;
@@ -68,17 +70,23 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     private boolean mLocationPermissionGranted = false;
     private float mDefaultZoom = 15f;
+
+    // Meegegeven Bestemming
     private double mLatitude;
     private double mLongitude;
+
+    // Afstands Variabelen
     private float mDistance; // distance in km
     private float mTime; // time in minutes
     private float mRunSpeed = 0.2f; // speed in km/min (12 km/h / 60 = 0.2 km/min)
 
+    // Tijds Variabelen
     private long mStartTime;
     private float mRunTime;
 
+    // Maps Variabelen
     private Location mCurrenLocation;
-    private LatLng mDestination;
+    private LatLng mDestination = null;
     private GeoApiContext mGeoApiContext = null;
 
     @Override
@@ -182,30 +190,38 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         try {
             if (mLocationPermissionGranted) {
                 Task location = mFusedLocationProviderClient.getLastLocation();
-                location.addOnCompleteListener(this::onComplete);
+                location.addOnCompleteListener(new OnCompleteListener(){
+                    public void onComplete(Task task) {
+                        // Als er een locatie is meegegeven dan gaat hij de camera inzoemen met de meegegeven zoom
+                        // en gaat hij het center van de camera op de meegegeven coördinaten zeten
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "onComplete: found location");
+                            mCurrenLocation = (Location) task.getResult();
+                            moveCamera(new LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()),
+                                    mDefaultZoom, "Start");
+                        } else {
+                            Log.d(TAG, "onComplete: current location is null");
+                        }
+                    }
+                });
+                location.addOnSuccessListener(new OnSuccessListener() {
+                    @Override
+                    public void onSuccess(Object o) {
+                        if (mCurrenLocation != null){
+                            if (mLatitude != 0 || mLongitude != 0) {
+                                mDestination = new LatLng(mLatitude, mLongitude);
+                            } else {
+                                mDestination = new LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude());
+                            }
+                            calculateDirections(mDestination);
+                            mStartTime = SystemClock.elapsedRealtime();
+                            Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
+                        }
+                    }
+                });
             }
         } catch (SecurityException e) {
             Log.e(TAG, "getDeviceLocation: SecurityException: " + e.getMessage());
-        }
-    }
-
-    private void onComplete(Task task) {
-        // Als er een locatie is meegegeven dan gaat hij de camera inzoemen met de meegegeven zoom
-        // en gaat hij het center van de camera op de meegegeven coördinaten zeten
-        if (task.isSuccessful()) {
-            Log.d(TAG, "onComplete: found location");
-            mCurrenLocation = (Location) task.getResult();
-            if (mLatitude != 0 || mLongitude != 0) {
-                mDestination = new LatLng(mLatitude, mLongitude);
-            } else {
-                mDestination = new LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude());
-            }
-            moveCamera(mDestination, mDefaultZoom, "My Destination");
-            calculateDirections(mDestination);
-            mStartTime = SystemClock.elapsedRealtime();
-            Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
-        } else {
-            Log.d(TAG, "onComplete: current location is null");
         }
     }
 
@@ -408,7 +424,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     @Override
     protected void onResume() {
         super.onResume();
-        update();
+        //update();
     }
 
     private Runnable updater;
