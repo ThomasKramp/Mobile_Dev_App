@@ -72,7 +72,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private double mLongitude;
     private float mDistance; // distance in km
     private float mTime; // time in minutes
-    private float mRunSpeed = 12 / 60; // speed in km/min (km/h / 60 = km/min)
+    private float mRunSpeed = 0.2f; // speed in km/min (12 km/h / 60 = 0.2 km/min)
 
     private long mStartTime;
     private float mRunTime;

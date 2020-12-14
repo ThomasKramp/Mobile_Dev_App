@@ -66,10 +66,15 @@ public class TimeTab extends Fragment {
     }
 
     public float getTime() {
+        float totalMinutes = 0;
         EditText mEditTextHours = getView().findViewById(R.id.timeInHours_input);
         EditText mEditTextMinutes = getView().findViewById(R.id.timeInMinutes_input);
-        float totalMinutes = Integer.parseInt(mEditTextHours.getText().toString()) * 60
-                + Integer.parseInt(mEditTextMinutes.getText().toString());
+        String hours = mEditTextHours.getText().toString();
+        String minutes = mEditTextMinutes.getText().toString();
+        if(!hours.equals(""))
+            totalMinutes += Integer.parseInt(hours) * 60;
+        if(!minutes.equals(""))
+            totalMinutes += Integer.parseInt(minutes);
         return totalMinutes;
     }
 }
