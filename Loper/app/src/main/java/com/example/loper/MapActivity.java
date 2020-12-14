@@ -85,7 +85,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private float mRunTime;
 
     // Maps Variabelen
-    private Location mCurrenLocation;
+    private Location mCurrentLocation;
     private LatLng mDestination = null;
     private GeoApiContext mGeoApiContext = null;
 
@@ -196,8 +196,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         // en gaat hij het center van de camera op de meegegeven coördinaten zeten
                         if (task.isSuccessful()) {
                             Log.d(TAG, "onComplete: found location");
-                            mCurrenLocation = (Location) task.getResult();
-                            moveCamera(new LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()),
+                            mCurrentLocation = (Location) task.getResult();
+                            moveCamera(new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()),
                                     mDefaultZoom, "Start");
                         } else {
                             Log.d(TAG, "onComplete: current location is null");
@@ -207,11 +207,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 location.addOnSuccessListener(new OnSuccessListener() {
                     @Override
                     public void onSuccess(Object o) {
-                        if (mCurrenLocation != null){
+                        if (mCurrentLocation != null){
                             if (mLatitude != 0 || mLongitude != 0) {
                                 mDestination = new LatLng(mLatitude, mLongitude);
                             } else {
-                                mDestination = new LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude());
+                                mDestination = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
                             }
                             calculateDirections(mDestination);
                             mStartTime = SystemClock.elapsedRealtime();
@@ -243,13 +243,13 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         generateBestDirection(destination);
 
         com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
-        wayPoints[0] = calculateWaypoint(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude(),
+        wayPoints[0] = calculateWaypoint(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(),
                 bestDirections[0]);
         wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, bestDirections[1]);
         wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, bestDirections[2]);
 
         // StartPunt toevoegen
-        directions.origin(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()));
+        directions.origin(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
         // Middelpunten toevoegen
         directions.waypoints(wayPoints);
         // EindPunt toevoegen
@@ -289,12 +289,12 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
             gotResult = false;
 
-            wayPoints[0] = calculateWaypoint(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude(),
+            wayPoints[0] = calculateWaypoint(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(),
                     windDirections[0]);
             wayPoints[1] = calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng, windDirections[1]);
             wayPoints[2] = calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng, windDirections[2]);
 
-            directions.origin(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()));
+            directions.origin(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
             directions.waypoints(wayPoints);
             directions.destination(new com.google.maps.model.LatLng(destination.latitude, destination.longitude));
             directions.optimizeWaypoints(true);
