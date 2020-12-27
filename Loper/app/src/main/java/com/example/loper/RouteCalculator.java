@@ -4,10 +4,12 @@ package com.example.loper;
 
 import android.location.Location;
 import android.os.AsyncTask;
+import android.os.SystemClock;
 import android.util.Log;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.DirectionsApiRequest;
@@ -46,10 +48,16 @@ public class RouteCalculator {
     // Task Variabelen
     private String TAG = "RouteCalculator";
     public DirectionsRoute bestRoute = null;
+    DirectionsTask directionsTask;
 
     public void CalculateTask(float distance){
-        DirectionsTask directionsTask = new DirectionsTask(this);
+        directionsTask = new DirectionsTask(this);
         directionsTask.execute(distance);
+    }
+
+    public void StopTask(){
+        directionsTask.cancel(true);
+        Log.d(TAG, "StopTask: Task is stopped");
     }
 
     private static class DirectionsTask extends AsyncTask<Float, Void, DirectionsRoute>{
@@ -74,6 +82,7 @@ public class RouteCalculator {
             bestDistance -= distance;
 
             for (WindDirections[] windDirections: directionsList){
+                if (isCancelled()) return null;
                 DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
                 com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
                 gotResult = false;
@@ -95,9 +104,10 @@ public class RouteCalculator {
                 directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
                     @Override
                     public void onResult(DirectionsResult result) {
+                        if (gotBestRoute) return;
                         float runningDistance = 0;
                         for (DirectionsLeg leg: result.routes[0].legs) {
-                            String[] stringArray = new String[2];
+                            String[] stringArray;
                             if(leg.distance.toString().contains(" km")) {
                                 stringArray = leg.distance.toString().split(" km");
                                 runningDistance += Float.parseFloat(stringArray[0]);
@@ -140,8 +150,11 @@ public class RouteCalculator {
         @Override
         protected void onPostExecute(DirectionsRoute directionsRoute) {
             super.onPostExecute(directionsRoute);
+            if (isCancelled()) return;
             RouteCalculator calculator = calculatorWeakReference.get();
             // Gaat de route decoderen
+            calculator.mMap.clear();
+            calculator.addMarker(calculator.mDestination);
             Log.d(calculator.TAG, "onPostExecute: leg: " + directionsRoute.legs[0].toString());
             List<com.google.maps.model.LatLng> decodedPath =
                     PolylineEncoding.decode(directionsRoute.overviewPolyline.getEncodedPath());
@@ -151,7 +164,19 @@ public class RouteCalculator {
             }
             Polyline polyline = calculator.mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
             // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
+            this.cancel(true);
         }
+    }
+
+    private void addMarker(LatLng latLng) {
+        // Gaat een zekere zoom initalizeren op de coördinaten van de huidige positie
+        Log.d(TAG, "moveCamera: moving the camera to lat: " + latLng.latitude +
+                ", lng: " + latLng.longitude);
+        // Marker zetten op de meegegeven plaats
+        MarkerOptions options = new MarkerOptions()
+                .position(latLng)
+                .title("Destination");
+        mMap.addMarker(options);
     }
 
     // Extra methodes

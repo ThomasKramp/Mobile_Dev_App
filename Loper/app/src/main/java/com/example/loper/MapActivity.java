@@ -44,10 +44,10 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.maps.model.DirectionsLeg;
+import com.google.maps.model.DirectionsStep;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -75,11 +75,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private float mTime; // time in minutes
     private float mRunSpeed = 0.2f; // speed in km/min (12 km/h / 60 = 0.2 km/min)
 
-    // Tijds Variabelen
-    private long mStartTime;
-    private float mRunTime;
-
-    private RouteCalculator calculator;
+    private RouteCalculator mCalculator;
 
     // Maps Variabelen
     private Location mCurrentLocation;
@@ -164,7 +160,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
             // Gaat de default show location knop weghalen
             // Dit is omdat je de default knop niet kunt verplaatsen
-            mMap.getUiSettings().setMyLocationButtonEnabled(false);
+            mMap.getUiSettings().setMyLocationButtonEnabled(true);
         }
     }
 
@@ -186,20 +182,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         if (task.isSuccessful()) {
                             Log.d(TAG, "onComplete: found location");
                             mCurrentLocation = (Location) task.getResult();
-                            addMarker(new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()),
-                                    mDefaultZoom, "Start");
                             if (mCurrentLocation != null){
                                 if (mLatitude != 0 || mLongitude != 0) {
                                     mDestination = new LatLng(mLatitude, mLongitude);
                                 } else {
                                     mDestination = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
                                 }
-                                addMarker(mDestination, mDefaultZoom, "Destination");
-                                calculator = new RouteCalculator(mCurrentLocation, mDestination, mMap,
-                                        getString(R.string.Maps_API_key));
-                                calculator.CalculateTask(mDistance);
-                                mStartTime = SystemClock.elapsedRealtime();
-                                Log.d(TAG, "onComplete: Time Since Start = " + mStartTime + "ms");
+                                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                                        new LatLng(mCurrentLocation.getLatitude(),
+                                                mCurrentLocation.getLongitude()), mDefaultZoom));
                             }
                         } else {
                             Log.d(TAG, "onComplete: current location is null");
@@ -212,109 +203,119 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    private void addMarker(LatLng latLng, float zoom, String title) {
-        // Gaat een zekere zoom initalizeren op de coördinaten van de huidige positie
-        Log.d(TAG, "moveCamera: moving the camera to lat: " + latLng.latitude +
-                ", lng: " + latLng.longitude);
-        if (title == "Start") mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
-        // Marker zetten op de meegegeven plaats
-        MarkerOptions options = new MarkerOptions()
-                .position(latLng)
-                .title(title);
-        mMap.addMarker(options);
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
-        //update();
+        update();
     }
 
     private Runnable updater;
+    private boolean stop = false;
+    private int delay = 3000; // 3 seconden
+    private float mRunTime;
+    private long mStartTime;
+
     private void update(){
         final Handler timerHandler = new Handler();
-
         updater = new Runnable() {
-            private LatLng mPointOfReference;
             @Override
             public void run() {
                 if (mStartTime != 0){
-                    int runningDistance = 0;
                     mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
                     Log.d(TAG, "run: Time Running = " + mRunTime + "min");
+                    float runningDistance = 0;
+                    boolean onTime = true;
+                    for (DirectionsLeg leg: mCalculator.bestRoute.legs){
+                        for (DirectionsStep step: leg.steps) {
+                            String[] stringArray;
 
-                    for (DirectionsLeg leg: calculator.bestRoute.legs) {
-                        float tempDistance = 0;
-                        String[] stringArray;
+                            // Voegt de afstand van elke polyline/route toe aan tempDistance
+                            if(step.distance.toString().contains(" km")) {
+                                stringArray = step.distance.toString().split(" km");
+                                runningDistance += Float.parseFloat(stringArray[0]);
+                            }
+                            else if(step.distance.toString().contains(" m")) {
+                                stringArray = step.distance.toString().split(" m");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 1000;
+                            }
+                            else if(step.distance.toString().contains(" mi")) {
+                                stringArray = step.distance.toString().split(" mi");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 0.62137;
+                            }
+                            else if(step.distance.toString().contains(" ft")) {
+                                stringArray = step.distance.toString().split(" ft");
+                                runningDistance += Float.parseFloat(stringArray[0]) / 3280.8;
+                            }
 
-                        if(leg.distance.toString().contains(" km")) {
-                            stringArray = leg.distance.toString().split(" km");
-                            tempDistance += Float.parseFloat(stringArray[0]);
+                            Log.d(TAG, "run: Time = " + mRunTime + "min & Distance = " + runningDistance + "km");
+                            // Kijkt naar de juiste route
+                            if(isOnRoute(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(),
+                                    mCurrentLocation.getLongitude()), step.startLocation, step.endLocation)){
+                                Log.d(TAG, "run: You're on Route");
+                                // kijkt of de gebruiker nog steeds op tijd is voor de huidige route
+                                if (!isOnTime(runningDistance, mRunTime)){
+                                    Log.d(TAG, "run: You're not on Time");
+                                    mDistance -= runningDistance;
+                                    onTime = false;
+                                    break;
+                                }
+                            }
                         }
-                        else if(leg.distance.toString().contains(" m")) {
-                            stringArray = leg.distance.toString().split(" m");
-                            tempDistance += Float.parseFloat(stringArray[0]) / 1000;
-                        }
-                        else if(leg.distance.toString().contains(" mi")) {
-                            stringArray = leg.distance.toString().split(" mi");
-                            tempDistance += Float.parseFloat(stringArray[0]) / 0.62137;
-                        }
-                        else if(leg.distance.toString().contains(" ft")) {
-                            stringArray = leg.distance.toString().split(" ft");
-                            tempDistance += Float.parseFloat(stringArray[0]) / 3280.8;
-                        }
-
-                        Log.d(TAG, "run: RouteStart: " + leg.startLocation);
-                        Log.d(TAG, "run: RouteEnd: " + leg.endLocation);
-
-                        // Kijkt tussen welke 2 punten dat de user staat
-                        // if (isOnRoute(new com.google.maps.model.LatLng(mCurrenLocation.getLatitude(), mCurrenLocation.getLongitude()), leg.startLocation, leg.endLocation)){ }
-                        // Kijkt of de gebruiker nog op tijd is
-                        if (!isOnTime(runningDistance, runningDistance + tempDistance, mRunTime)){
-                            // De afstand wordt aangepast naarmate je een zeker punt bereikt hebt
-                            mDistance -= runningDistance;
-                            // Indien de gebruiker niet op tijd is zal de applicatie
-                            // een nieuwe route maken
-                            calculator.CalculateTask(mDistance);
-                            // De start tijd wordt gereset
-                            mStartTime = SystemClock.elapsedRealtime();
-                        }
-                        runningDistance += tempDistance;
+                        if (!onTime) break;
                     }
+                    if (!onTime){
+                        Toast.makeText(MapActivity.this, mDistance + "km to go", Toast.LENGTH_SHORT).show();
+                        mCalculator.StopTask();
+                        mCalculator.CalculateTask(mDistance);
+                        mStartTime = SystemClock.elapsedRealtime();
+                        Log.d(TAG, "run: Time Since Start = " + mStartTime + "ms");
+                    }
+                } else if (mDestination != null){
+                    mCalculator = new RouteCalculator(mCurrentLocation, mDestination, mMap,
+                            getString(R.string.Maps_API_key));
+                    mCalculator.CalculateTask(mDistance);
+                    delay = 60000; // 1 minuut
+                    mStartTime = SystemClock.elapsedRealtime();
+                    Log.d(TAG, "run: Time Since Start = " + mStartTime + "ms");
                 }
-                // Elke minuut wordt dit nagekeken
-                timerHandler.postDelayed(updater,60 * 1000);
+                // Zet de timer
+                if(!stop) timerHandler.postDelayed(updater, delay);
             }
 
             private boolean isOnRoute(com.google.maps.model.LatLng playerLocation,
                                       com.google.maps.model.LatLng startLocation,
                                       com.google.maps.model.LatLng endLocation){
                 // Ziet of de huidige locatie op de route staat voor latitude
-                if ((startLocation.lat < playerLocation.lat && playerLocation.lat < endLocation.lat)
-                        || (startLocation.lat > playerLocation.lat && playerLocation.lat > endLocation.lat)){
+                if ((startLocation.lat - 0.001 < playerLocation.lat && playerLocation.lat < endLocation.lat + 0.001)
+                        || (startLocation.lat + 0.001> playerLocation.lat && playerLocation.lat > endLocation.lat - 0.001)){
 
                     // Ziet of de huidige locatie op de route staat voor longitude
-                    return (startLocation.lng < playerLocation.lng && playerLocation.lng < endLocation.lng)
-                            || (startLocation.lng > playerLocation.lng && playerLocation.lng > endLocation.lng);
+                    return (startLocation.lng - 0.001 < playerLocation.lng && playerLocation.lng < endLocation.lng + 0.001)
+                            || (startLocation.lng + 0.001 > playerLocation.lng && playerLocation.lng > endLocation.lng - 0.001);
                 }
                 return false;
             }
 
-            private boolean isOnTime(float beginDistanceRoute, float endDistanceRoute,
-                                     float timeSinceCreate){
+            private boolean isOnTime(float runningdistance, float timeSinceCreate){
                 // Mijn snelheid * De gemiddelde loopsnelheid = De afstand die ik afgelegd heb
                 // Indien deze afstand tussen de afstanden van de route ligt,
                 // dan ben ik nog op schema
-                return beginDistanceRoute <= timeSinceCreate * mRunSpeed
-                        && timeSinceCreate * mRunSpeed <= endDistanceRoute;
+                return runningdistance + 0.5 > timeSinceCreate * mRunSpeed;
             }
         };
         timerHandler.post(updater);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        stop = true;
+        mCalculator.StopTask();
     }
 }
 
 /*
     LogCat Searches:
-    calculateDirections:
+    RouteCalculator:
     run:
  */
