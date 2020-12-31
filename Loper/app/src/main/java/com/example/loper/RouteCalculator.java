@@ -1,10 +1,10 @@
 package com.example.loper;
 
 // AsyncTask: https://www.youtube.com/watch?v=uKx0FuVriqA
-// Solution?: https://stackoverflow.com/questions/4080808/asynctask-doinbackground-does-not-run
 
 import android.location.Location;
 import android.os.AsyncTask;
+import android.os.SystemClock;
 import android.util.Log;
 
 import com.google.android.gms.maps.GoogleMap;
@@ -52,8 +52,8 @@ public class RouteCalculator {
     private List<WindDirections[]> directionsList;
 
     public void CalculateTask(float distance){
-        directionsTask = new DirectionsTask(this);
-        directionsTask.execute(distance);
+        directionsTask = new DirectionsTask(this, distance);
+        directionsTask.execute();
     }
 
     public void StopTask(){
@@ -61,40 +61,40 @@ public class RouteCalculator {
         Log.d(TAG, "StopTask: Task is stopped");
     }
 
-    private static class DirectionsTask extends AsyncTask<Float, Void, DirectionsRoute>{
+    private static class DirectionsTask extends AsyncTask<Void, Void, DirectionsRoute>{
 
         WeakReference<RouteCalculator> calculatorWeakReference;
+        float mDistance;
+        float bestDistance;
+        boolean gotResult;
+        boolean gotBestRoute;
 
-        public DirectionsTask(RouteCalculator calculator){
+        public DirectionsTask(RouteCalculator calculator, float distance){
             calculatorWeakReference = new WeakReference<RouteCalculator>(calculator);
+            mDistance = distance;
         }
 
-        float bestDistance = 0;
-        boolean gotResult = false;
-        boolean gotBestRoute = false;
-        float distance;
-
         @Override
-        protected DirectionsRoute doInBackground(Float... floats) {
+        protected DirectionsRoute doInBackground(Void... voids) {
             RouteCalculator calculator = calculatorWeakReference.get();
-            distance = floats[0];
-            Log.d(calculator.TAG, "doInBackground: Total distance: " + distance);
-            bestDistance -= distance;
+            Log.d(calculator.TAG, "doInBackground: Total distance: " + mDistance);
+            bestDistance -= mDistance;
             Log.d(calculator.TAG, "doInBackground: Async starts");
 
             for (WindDirections[] windDirections: calculator.directionsList){
                 Log.d(calculator.TAG, "doInBackgroundTest: Async working " + calculator.directionsList.indexOf(windDirections));
                 if (isCancelled()) return null;
+                SystemClock.sleep(1000);
                 DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
                 com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
                 gotResult = false;
 
                 wayPoints[0] = calculator.calculateWaypoint(calculator.mCurrentLocation.getLatitude(),
-                        calculator.mCurrentLocation.getLongitude(), windDirections[0], distance);
+                        calculator.mCurrentLocation.getLongitude(), windDirections[0], mDistance);
                 wayPoints[1] = calculator.calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng,
-                        windDirections[1], distance);
+                        windDirections[1], mDistance);
                 wayPoints[2] = calculator.calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng,
-                        windDirections[2], distance);
+                        windDirections[2], mDistance);
 
                 directions.origin(new com.google.maps.model.LatLng(calculator.mCurrentLocation.getLatitude(),
                         calculator.mCurrentLocation.getLongitude()));
@@ -129,10 +129,10 @@ public class RouteCalculator {
                             }
                         }
                         Log.d(calculator.TAG, "onResult: Total distance: " + runningDistance);
-                        if(Math.abs(distance - runningDistance) < Math.abs(distance - bestDistance)){
+                        if(Math.abs(mDistance - runningDistance) < Math.abs(mDistance - bestDistance)){
                             calculator.bestRoute = result.routes[0];
                             bestDistance = runningDistance;
-                            if (distance == runningDistance) gotBestRoute = true;
+                            if (mDistance == runningDistance) gotBestRoute = true;
                         }
                         gotResult = true;
                     }
@@ -157,6 +157,7 @@ public class RouteCalculator {
             if (isCancelled()) return;
             RouteCalculator calculator = calculatorWeakReference.get();
             Log.d(calculator.TAG, "doInBackgroundTest: Async completed");
+            Log.d(calculator.TAG, "doInBackgroundTest:");
 
             // Gaat de route decoderen
             calculator.mMap.clear();
