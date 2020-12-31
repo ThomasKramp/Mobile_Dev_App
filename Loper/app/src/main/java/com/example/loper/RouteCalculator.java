@@ -1,10 +1,10 @@
 package com.example.loper;
 
 // AsyncTask: https://www.youtube.com/watch?v=uKx0FuVriqA
+// Solution?: https://stackoverflow.com/questions/4080808/asynctask-doinbackground-does-not-run
 
 import android.location.Location;
 import android.os.AsyncTask;
-import android.os.SystemClock;
 import android.util.Log;
 
 import com.google.android.gms.maps.GoogleMap;
@@ -42,13 +42,14 @@ public class RouteCalculator {
         mGeoApiContext = new GeoApiContext.Builder()
                 .apiKey(ApiKey)
                 .build();
-
+        directionsList = generateDirections();
     }
 
     // Task Variabelen
     private String TAG = "RouteCalculator";
     public DirectionsRoute bestRoute = null;
     DirectionsTask directionsTask;
+    private List<WindDirections[]> directionsList;
 
     public void CalculateTask(float distance){
         directionsTask = new DirectionsTask(this);
@@ -78,10 +79,11 @@ public class RouteCalculator {
             RouteCalculator calculator = calculatorWeakReference.get();
             distance = floats[0];
             Log.d(calculator.TAG, "doInBackground: Total distance: " + distance);
-            List<WindDirections[]> directionsList = calculator.generateDirections();
             bestDistance -= distance;
+            Log.d(calculator.TAG, "doInBackground: Async starts");
 
-            for (WindDirections[] windDirections: directionsList){
+            for (WindDirections[] windDirections: calculator.directionsList){
+                Log.d(calculator.TAG, "doInBackgroundTest: Async working " + calculator.directionsList.indexOf(windDirections));
                 if (isCancelled()) return null;
                 DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
                 com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
@@ -104,6 +106,7 @@ public class RouteCalculator {
                 directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
                     @Override
                     public void onResult(DirectionsResult result) {
+                        Log.d(calculator.TAG, "doInBackgroundTest: Async finished " + calculator.directionsList.indexOf(windDirections));
                         if (gotBestRoute) return;
                         float runningDistance = 0;
                         for (DirectionsLeg leg: result.routes[0].legs) {
@@ -136,6 +139,7 @@ public class RouteCalculator {
 
                     @Override
                     public void onFailure(Throwable e) {
+                        Log.d(calculator.TAG, "doInBackgroundTest: Async failed " + calculator.directionsList.indexOf(windDirections));
                         Log.d(calculator.TAG, "onFailure: Failed to get directions: " + e.getMessage());
                         gotResult = true;
                     }
@@ -152,9 +156,12 @@ public class RouteCalculator {
             super.onPostExecute(directionsRoute);
             if (isCancelled()) return;
             RouteCalculator calculator = calculatorWeakReference.get();
+            Log.d(calculator.TAG, "doInBackgroundTest: Async completed");
+
             // Gaat de route decoderen
             calculator.mMap.clear();
             calculator.addMarker(calculator.mDestination);
+
             Log.d(calculator.TAG, "onPostExecute: leg: " + directionsRoute.legs[0].toString());
             List<com.google.maps.model.LatLng> decodedPath =
                     PolylineEncoding.decode(directionsRoute.overviewPolyline.getEncodedPath());
@@ -162,6 +169,7 @@ public class RouteCalculator {
             for (com.google.maps.model.LatLng latlng: decodedPath) {
                 newDecodedPath.add(new LatLng(latlng.lat, latlng.lng));
             }
+
             Polyline polyline = calculator.mMap.addPolyline(new PolylineOptions().addAll(newDecodedPath));
             // polyline.setColor(ContextCompat.getColor("Activity", R.color.colorPrimaryDark));
             this.cancel(true);
