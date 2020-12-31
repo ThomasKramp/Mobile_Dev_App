@@ -214,6 +214,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private int delay = 3000; // 3 seconden
     private float mRunTime;
     private long mStartTime;
+    // Deze variabele wordt gebruikt om de update te tonen,
+    // indien u de route niet wilt aflopen kan u de deelFactor gelijk zetten aan 2.
+    private int deelFactor = 1;
 
     private void update(){
         final Handler timerHandler = new Handler();
@@ -255,6 +258,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 // kijkt of de gebruiker nog steeds op tijd is voor de huidige route
                                 if (!isOnTime(runningDistance, mRunTime)){
                                     Log.d(TAG, "run: You're not on Time");
+                                    // Deze lijn is om te tonen dat de update daadwerkelijk werkt,
+                                    // anders moet u de route volgen, om een degelijk verschil te zien in de route.
+                                    mDistance /= deelFactor;
                                     mDistance -= runningDistance;
                                     onTime = false;
                                     break;

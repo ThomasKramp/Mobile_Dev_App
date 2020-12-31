@@ -4,7 +4,6 @@ package com.example.loper;
 
 import android.location.Location;
 import android.os.AsyncTask;
-import android.os.SystemClock;
 import android.util.Log;
 
 import com.google.android.gms.maps.GoogleMap;
@@ -64,10 +63,10 @@ public class RouteCalculator {
     private static class DirectionsTask extends AsyncTask<Void, Void, DirectionsRoute>{
 
         WeakReference<RouteCalculator> calculatorWeakReference;
-        float mDistance;
-        float bestDistance;
-        boolean gotResult;
-        boolean gotBestRoute;
+        float mDistance = 0;
+        float bestDistance = 0;
+        boolean gotResult = false;
+        boolean gotBestRoute = false;
 
         public DirectionsTask(RouteCalculator calculator, float distance){
             calculatorWeakReference = new WeakReference<RouteCalculator>(calculator);
@@ -79,12 +78,10 @@ public class RouteCalculator {
             RouteCalculator calculator = calculatorWeakReference.get();
             Log.d(calculator.TAG, "doInBackground: Total distance: " + mDistance);
             bestDistance -= mDistance;
-            Log.d(calculator.TAG, "doInBackground: Async starts");
+            Log.d(calculator.TAG, "doInBackground: AsyncTest starts");
 
             for (WindDirections[] windDirections: calculator.directionsList){
-                Log.d(calculator.TAG, "doInBackgroundTest: Async working " + calculator.directionsList.indexOf(windDirections));
                 if (isCancelled()) return null;
-                SystemClock.sleep(1000);
                 DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
                 com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
                 gotResult = false;
@@ -103,47 +100,58 @@ public class RouteCalculator {
                         calculator.mDestination.longitude));
                 directions.optimizeWaypoints(true);
                 directions.mode(TravelMode.WALKING);
-                directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
-                    @Override
-                    public void onResult(DirectionsResult result) {
-                        Log.d(calculator.TAG, "doInBackgroundTest: Async finished " + calculator.directionsList.indexOf(windDirections));
-                        if (gotBestRoute) return;
-                        float runningDistance = 0;
-                        for (DirectionsLeg leg: result.routes[0].legs) {
-                            String[] stringArray;
-                            if(leg.distance.toString().contains(" km")) {
-                                stringArray = leg.distance.toString().split(" km");
-                                runningDistance += Float.parseFloat(stringArray[0]);
-                            }
-                            else if(leg.distance.toString().contains(" m")) {
-                                stringArray = leg.distance.toString().split(" m");
-                                runningDistance += Float.parseFloat(stringArray[0]) / 1000;
-                            }
-                            else if(leg.distance.toString().contains(" mi")) {
-                                stringArray = leg.distance.toString().split(" mi");
-                                runningDistance += Float.parseFloat(stringArray[0]) / 0.62137;
-                            }
-                            else if(leg.distance.toString().contains(" ft")) {
-                                stringArray = leg.distance.toString().split(" ft");
-                                runningDistance += Float.parseFloat(stringArray[0]) / 3280.8;
-                            }
-                        }
-                        Log.d(calculator.TAG, "onResult: Total distance: " + runningDistance);
-                        if(Math.abs(mDistance - runningDistance) < Math.abs(mDistance - bestDistance)){
-                            calculator.bestRoute = result.routes[0];
-                            bestDistance = runningDistance;
-                            if (mDistance == runningDistance) gotBestRoute = true;
-                        }
-                        gotResult = true;
-                    }
 
-                    @Override
-                    public void onFailure(Throwable e) {
-                        Log.d(calculator.TAG, "doInBackgroundTest: Async failed " + calculator.directionsList.indexOf(windDirections));
-                        Log.d(calculator.TAG, "onFailure: Failed to get directions: " + e.getMessage());
-                        gotResult = true;
-                    }
-                });
+                Log.d(calculator.TAG, "doInBackground: AsyncTest working " + calculator.directionsList.indexOf(windDirections));
+                try {
+                    directions.setCallback(new PendingResult.Callback<DirectionsResult>() {
+                        @Override
+                        public void onResult(DirectionsResult result) {
+                            if (gotBestRoute) return;
+                            float runningDistance = 0;
+                            for (DirectionsLeg leg: result.routes[0].legs) {
+                                String[] stringArray;
+                                if(leg.distance.toString().contains(" km")) {
+                                    stringArray = leg.distance.toString().split(" km");
+                                    runningDistance += Float.parseFloat(stringArray[0]);
+                                }
+                                else if(leg.distance.toString().contains(" m")) {
+                                    stringArray = leg.distance.toString().split(" m");
+                                    runningDistance += Float.parseFloat(stringArray[0]) / 1000;
+                                }
+                                else if(leg.distance.toString().contains(" mi")) {
+                                    stringArray = leg.distance.toString().split(" mi");
+                                    runningDistance += Float.parseFloat(stringArray[0]) / 0.62137;
+                                }
+                                else if(leg.distance.toString().contains(" ft")) {
+                                    stringArray = leg.distance.toString().split(" ft");
+                                    runningDistance += Float.parseFloat(stringArray[0]) / 3280.8;
+                                }
+                            }
+                            Log.d(calculator.TAG, "onResult: Total distance: " + runningDistance);
+                            if(Math.abs(mDistance - runningDistance) < Math.abs(mDistance - bestDistance)){
+                                calculator.bestRoute = result.routes[0];
+                                bestDistance = runningDistance;
+                                if (mDistance == runningDistance) gotBestRoute = true;
+                            }
+                            gotResult = true;
+                            Log.d(calculator.TAG, "onResult: AsyncTest finished " + calculator.directionsList.indexOf(windDirections));
+                        }
+
+                        @Override
+                        public void onFailure(Throwable e) {
+                            Log.d(calculator.TAG, "onFailure: Failed to get directions: " + e.getMessage());
+                            gotResult = true;
+                            Log.d(calculator.TAG, "onFailure: AsyncTest failed " + calculator.directionsList.indexOf(windDirections));
+                        }
+                    });
+                } catch (Exception e){
+                    Log.e(calculator.TAG, "doInBackground: AsyncTest Exception: ", e);
+                }
+                try {
+                    Thread.sleep( 1000 );
+                } catch ( InterruptedException e ) {
+                    e.printStackTrace();
+                }
                 if (gotBestRoute)
                     return calculator.bestRoute;
                 while (!gotResult);
@@ -156,8 +164,8 @@ public class RouteCalculator {
             super.onPostExecute(directionsRoute);
             if (isCancelled()) return;
             RouteCalculator calculator = calculatorWeakReference.get();
-            Log.d(calculator.TAG, "doInBackgroundTest: Async completed");
-            Log.d(calculator.TAG, "doInBackgroundTest:");
+            Log.d(calculator.TAG, "onPostExecute: AsyncTest completed");
+            Log.d(calculator.TAG, "onPostExecute: AsyncTest");
 
             // Gaat de route decoderen
             calculator.mMap.clear();
