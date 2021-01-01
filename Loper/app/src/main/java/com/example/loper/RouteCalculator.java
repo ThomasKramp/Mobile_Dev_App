@@ -2,9 +2,11 @@ package com.example.loper;
 
 // AsyncTask: https://www.youtube.com/watch?v=uKx0FuVriqA
 
+import android.app.Activity;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
@@ -31,9 +33,10 @@ public class RouteCalculator {
     private LatLng mDestination;
     private GoogleMap mMap;
     private GeoApiContext mGeoApiContext;
+    private Activity mActivity;
 
     public RouteCalculator(Location currentLocation, LatLng destination, GoogleMap map,
-                           String ApiKey){
+                           String ApiKey, Activity activity){
         mCurrentLocation = currentLocation;
         mDestination = destination;
         mMap = map;
@@ -42,6 +45,7 @@ public class RouteCalculator {
                 .apiKey(ApiKey)
                 .build();
         directionsList = generateDirections();
+        mActivity = activity;
     }
 
     // Task Variabelen
@@ -166,6 +170,7 @@ public class RouteCalculator {
             RouteCalculator calculator = calculatorWeakReference.get();
             Log.d(calculator.TAG, "onPostExecute: AsyncTest completed");
             Log.d(calculator.TAG, "onPostExecute: AsyncTest");
+            Toast.makeText(calculator.mActivity, "Running Distance " + bestDistance + "km", Toast.LENGTH_SHORT).show();
 
             // Gaat de route decoderen
             calculator.mMap.clear();

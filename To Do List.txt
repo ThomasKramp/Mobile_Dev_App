@@ -1,0 +1,8 @@
+
+	StappenPlan:
+		1) Een grote polyline maken op basis van afstand
+			1.1) Afstand naar LatLng coördinaten converteren en route op die manier vinden
+		2) Tijd omzetten naar afstand
+		3) Polylines bij tijd optie dynamisch laten veranderen op basis van looptijd
+			3.1) Interne Timer functie vinden in Android Studio en plaatsen/starten in mapactivity
+			3.2) Dynamisch afstand aanpassen zodat berekeningen nog kloppen

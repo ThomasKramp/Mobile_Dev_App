@@ -278,7 +278,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                     }
                 } else if (mDestination != null){
                     mCalculator = new RouteCalculator(mCurrentLocation, mDestination, mMap,
-                            getString(R.string.Maps_API_key));
+                            getString(R.string.Maps_API_key), MapActivity.this);
                     mCalculator.CalculateTask(mDistance);
                     delay = 60000; // 1 minuut
                     mStartTime = SystemClock.elapsedRealtime();
