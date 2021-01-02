@@ -123,8 +123,12 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
         }
-        if (IsServiceOK()){
-            startActivity(intent);
+        try {
+            if (IsServiceOK()){
+                startActivity(intent);
+            }
+        }catch (Exception e){
+            Log.e(TAG, "InitializeRoute: Exception ", e);
         }
     }
 

@@ -211,19 +211,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     private Runnable updater;
     private boolean stop = false;
-    private int delay = 3000; // 3 seconden
+    private int delay = 5000; // 3 seconden
     private float mRunTime;
     private long mStartTime;
     // Deze variabele wordt gebruikt om de update te tonen,
     // indien u de route niet wilt aflopen kan u de deelFactor gelijk zetten aan 2.
     private int deelFactor = 1;
+    final Handler timerHandler = new Handler();
 
     private void update(){
-        final Handler timerHandler = new Handler();
         updater = new Runnable() {
             @Override
             public void run() {
                 if (mStartTime != 0){
+                    LatLng temp = new LatLng(mMap.getMyLocation().getLatitude(), mMap.getMyLocation().getLongitude());
                     mRunTime = (float) ((SystemClock.elapsedRealtime() - mStartTime) / (60 * 1000));
                     Log.d(TAG, "run: Time Running = " + mRunTime + "min");
                     float runningDistance = 0;
@@ -252,8 +253,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                             Log.d(TAG, "run: Time = " + mRunTime + "min & Distance = " + runningDistance + "km");
                             // Kijkt naar de juiste route
-                            if(isOnRoute(new com.google.maps.model.LatLng(mCurrentLocation.getLatitude(),
-                                    mCurrentLocation.getLongitude()), step.startLocation, step.endLocation)){
+                            if(isOnRoute(new com.google.maps.model.LatLng(temp.latitude, temp.longitude),
+                                    step.startLocation, step.endLocation)){
                                 Log.d(TAG, "run: You're on Route");
                                 // kijkt of de gebruiker nog steeds op tijd is voor de huidige route
                                 if (!isOnTime(runningDistance, mRunTime)){
@@ -261,7 +262,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     // Deze lijn is om te tonen dat de update daadwerkelijk werkt,
                                     // anders moet u de route volgen, om een degelijk verschil te zien in de route.
                                     mDistance /= deelFactor;
-                                    mDistance -= runningDistance;
                                     onTime = false;
                                     break;
                                 }
@@ -271,18 +271,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                     }
                     if (!onTime){
                         Toast.makeText(MapActivity.this, mDistance + "km to go", Toast.LENGTH_SHORT).show();
+                        mDistance -= runningDistance;
                         mCalculator.StopTask();
-                        mCalculator.CalculateTask(mDistance);
-                        mStartTime = SystemClock.elapsedRealtime();
-                        Log.d(TAG, "run: Time Since Start = " + mStartTime + "ms");
+                        mCalculator.CalculateTask(mDistance, temp);
                     }
                 } else if (mDestination != null){
-                    mCalculator = new RouteCalculator(mCurrentLocation, mDestination, mMap,
-                            getString(R.string.Maps_API_key), MapActivity.this);
-                    mCalculator.CalculateTask(mDistance);
-                    delay = 60000; // 1 minuut
-                    mStartTime = SystemClock.elapsedRealtime();
-                    Log.d(TAG, "run: Time Since Start = " + mStartTime + "ms");
+                    try {
+                        mCalculator = new RouteCalculator(mDestination, mMap, getString(R.string.Maps_API_key), MapActivity.this);
+                        mCalculator.CalculateTask(mDistance, new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
+                        delay = 60000; // 1 minuut
+                        mStartTime = SystemClock.elapsedRealtime();
+                        Log.d(TAG, "run: Time Since Start = " + mStartTime + "ms");
+                    } catch (Exception e) {
+                        Log.d(TAG, "run: AsyncTest " + e.toString());
+                    }
                 }
                 // Zet de timer
                 if(!stop) timerHandler.postDelayed(updater, delay);
@@ -314,9 +316,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
         stop = true;
         mCalculator.StopTask();
+        timerHandler.removeCallbacksAndMessages(null);
+        SystemClock.sleep(1000);
+        super.onDestroy();
     }
 }
 
@@ -324,4 +328,5 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     LogCat Searches:
     RouteCalculator:
     run:
+    AsyncTest
  */

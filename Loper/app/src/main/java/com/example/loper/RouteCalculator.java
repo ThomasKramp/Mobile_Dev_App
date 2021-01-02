@@ -3,7 +3,6 @@ package com.example.loper;
 // AsyncTask: https://www.youtube.com/watch?v=uKx0FuVriqA
 
 import android.app.Activity;
-import android.location.Location;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.Toast;
@@ -29,15 +28,12 @@ import java.util.List;
 public class RouteCalculator {
 
     // Constructor variabelen
-    private Location mCurrentLocation;
     private LatLng mDestination;
     private GoogleMap mMap;
     private GeoApiContext mGeoApiContext;
     private Activity mActivity;
 
-    public RouteCalculator(Location currentLocation, LatLng destination, GoogleMap map,
-                           String ApiKey, Activity activity){
-        mCurrentLocation = currentLocation;
+    public RouteCalculator(LatLng destination, GoogleMap map, String ApiKey, Activity activity){
         mDestination = destination;
         mMap = map;
         // Instantieer de directions calculator
@@ -53,8 +49,10 @@ public class RouteCalculator {
     public DirectionsRoute bestRoute = null;
     DirectionsTask directionsTask;
     private List<WindDirections[]> directionsList;
+    private LatLng mCurrentLocation;
 
-    public void CalculateTask(float distance){
+    public void CalculateTask(float distance, LatLng currentLocation){
+        mCurrentLocation = currentLocation;
         directionsTask = new DirectionsTask(this, distance);
         directionsTask.execute();
     }
@@ -71,6 +69,7 @@ public class RouteCalculator {
         float bestDistance = 0;
         boolean gotResult = false;
         boolean gotBestRoute = false;
+        DirectionsApiRequest directions;
 
         public DirectionsTask(RouteCalculator calculator, float distance){
             calculatorWeakReference = new WeakReference<RouteCalculator>(calculator);
@@ -85,20 +84,23 @@ public class RouteCalculator {
             Log.d(calculator.TAG, "doInBackground: AsyncTest starts");
 
             for (WindDirections[] windDirections: calculator.directionsList){
-                if (isCancelled()) return null;
-                DirectionsApiRequest directions = new DirectionsApiRequest(calculator.mGeoApiContext);
+                if (isCancelled() || mDistance == 0) {
+                    if (directions != null) directions.cancel();
+                    return null;
+                }
+                directions = new DirectionsApiRequest(calculator.mGeoApiContext);
                 com.google.maps.model.LatLng[] wayPoints = new com.google.maps.model.LatLng[3];
                 gotResult = false;
 
-                wayPoints[0] = calculator.calculateWaypoint(calculator.mCurrentLocation.getLatitude(),
-                        calculator.mCurrentLocation.getLongitude(), windDirections[0], mDistance);
+                wayPoints[0] = calculator.calculateWaypoint(calculator.mCurrentLocation.latitude,
+                        calculator.mCurrentLocation.longitude, windDirections[0], mDistance);
                 wayPoints[1] = calculator.calculateWaypoint(wayPoints[0].lat, wayPoints[0].lng,
                         windDirections[1], mDistance);
                 wayPoints[2] = calculator.calculateWaypoint(wayPoints[1].lat, wayPoints[1].lng,
                         windDirections[2], mDistance);
 
-                directions.origin(new com.google.maps.model.LatLng(calculator.mCurrentLocation.getLatitude(),
-                        calculator.mCurrentLocation.getLongitude()));
+                directions.origin(new com.google.maps.model.LatLng(calculator.mCurrentLocation.latitude,
+                        calculator.mCurrentLocation.longitude));
                 directions.waypoints(wayPoints);
                 directions.destination(new com.google.maps.model.LatLng(calculator.mDestination.latitude,
                         calculator.mDestination.longitude));
@@ -131,6 +133,7 @@ public class RouteCalculator {
                                     runningDistance += Float.parseFloat(stringArray[0]) / 3280.8;
                                 }
                             }
+
                             Log.d(calculator.TAG, "onResult: Total distance: " + runningDistance);
                             if(Math.abs(mDistance - runningDistance) < Math.abs(mDistance - bestDistance)){
                                 calculator.bestRoute = result.routes[0];
@@ -152,10 +155,8 @@ public class RouteCalculator {
                     Log.e(calculator.TAG, "doInBackground: AsyncTest Exception: ", e);
                 }
                 try {
-                    Thread.sleep( 1000 );
-                } catch ( InterruptedException e ) {
-                    e.printStackTrace();
-                }
+                    Thread.sleep(2000);
+                } catch (Exception e) { }
                 if (gotBestRoute)
                     return calculator.bestRoute;
                 while (!gotResult);
